@@ -1,0 +1,53 @@
+name: hygiene
+
+# Çağıran reponun ortak "hijyen" kapıları. Paylaşılan reusable workflow (Nergora/.github):
+# bir kontrol bir kez burada düzeltilir, her repo aynı sonucu alır — kopyalar ayrışmaz.
+#
+# Çağıran repo (workflow dosyasında yalnız bu kadar):
+#
+#   jobs:
+#     hygiene:
+#       uses: Nergora/.github/.github/workflows/hygiene.yml@main
+#
+# Şu an tek kontrol var: workflow dosyalarında tırnaksız bir değerin içindeki ": " —
+# YAML'ı bozar, GitHub dosyayı hiç parse edemez (koşu 0 job ile düşer, workflow adı
+# dosya yoluna iner, "on:" filtreleri işlemez). Yeni bir ortak kontrol eklerken buraya
+# eklenir; repo'lar kendiliğinden alır.
+
+on:
+  workflow_call:
+    inputs:
+      node-version:
+        description: Node surumu
+        type: string
+        default: "22"
+      workflows-path:
+        description: Kontrol edilecek workflow dizini
+        type: string
+        default: ".github/workflows"
+
+jobs:
+  hygiene:
+    name: hygiene (workflow YAML)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Cagiran repo
+        uses: actions/checkout@v4
+
+      # Paylasilan kontroller bu repodan gelir; cagiran repoya karismaz.
+      - name: Paylasilan kontroller
+        uses: actions/checkout@v4
+        with:
+          repository: Nergora/.github
+          ref: main
+          path: .nergora-shared
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+
+      - name: Workflow YAML (tirnaksiz iki nokta + bosluk)
+        run: node .nergora-shared/scripts/check-workflow-yaml.mjs "$WORKFLOWS_PATH"
+        env:
+          WORKFLOWS_PATH: ${{ inputs.workflows-path }}
